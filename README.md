@@ -1,18 +1,24 @@
-# Dinámica interactiva: Modelo en V — v1.3 (con generador de enlace)
+# Dinámica interactiva: Modelo en V — v1.5
 
-- Sin respuestas quemadas en el repo.
-- `?map=BASE64_JSON` para validar (solo docente).
-- `?pin=XXXX` + botón **Modo docente (PIN)** para revelar puntaje y resaltados.
-- **Generador de enlace** incorporado (convierte JSON → Base64 y arma la URL).
+- Validación por `?map=BASE64_JSON` (sin respuestas quemadas).
+- **PIN docente** `?pin=XXXX` y botón “Modo docente (PIN)”.
+- **Link único para estudiantes** y **link de docente** (admin) en ventanas separadas.
+- **Feedback por celda** (verde/rojo) y **puntaje corregido** (parejas correctas).
+- **Sesiones** `?session=...` con panel **admin** (`&admin=1`) y export CSV/JSON.
+- **Sink opcional** `&sink=https://...` para recibir resultados por POST.
 
-## Ejecutar en local
+## Local
 ```
 npm install
 npm run dev
 ```
 
-## Despliegue (GitHub Pages)
+## Generar enlaces en la app
+- Estudiante: `?session=...&map=...`
+- Docente: `?session=...&map=...&pin=XXXX&admin=1`
+
+## GitHub Pages
 ```
 npm run deploy
 ```
-Luego activa **Settings → Pages → Branch: gh-pages**.
+Activa en GitHub → **Settings → Pages** → rama `gh-pages`.
