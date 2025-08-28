@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
 
+// v1.6 — Disposición real en V con conectores SVG; scoring por parejas; vista admin, sesiones y enlaces alumno/docente.
+
 const LEFT_PHASES = [
   { id: 'req-sis', label: 'Requerimientos del sistema' },
   { id: 'req-sw', label: 'Requisitos de software' },
@@ -31,10 +33,9 @@ function timeFmt(s){ const m=Math.floor(s/60); const r=s%60; return `${m}:${Stri
 
 function AppCard({id,label}){ return <div className="card" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', id)}>{label}</div> }
 
-function Slot({id, cards, placement, setPlacement, validated}){
+function Slot({id, cards, placement, setPlacement, validated, side}){
   const cardId = placement[id]
   const card = cards.find(c=>c.id===cardId)
-  const isRight = RIGHT_TESTS.some(t=>t.id===id)
   const isCorrect = validated && placement[id] === id
   const isWrong = validated && placement[id] && placement[id] !== id
 
@@ -52,7 +53,7 @@ function Slot({id, cards, placement, setPlacement, validated}){
   const cls = `slot${isCorrect?' ok':''}${isWrong?' bad':''}`
 
   return (
-    <div className={cls} onDragOver={e=>e.preventDefault()} onDrop={onDrop} style={{background:isRight?'#ffffffb3':'#fff'}}>
+    <div className={cls} onDragOver={e=>e.preventDefault()} onDrop={onDrop}>
       {card ? <AppCard id={card.id} label={card.label}/> : <span className="small" style={{color:'#94a3b8'}}>Arrastra aquí</span>}
     </div>
   )
@@ -81,6 +82,7 @@ export default function App(){
   const loadResults = ()=>{ try{ return JSON.parse(localStorage.getItem('vmodel_results_'+SESSION_ID)) || [] }catch{ return [] } }
   const [results,setResults]=useState(loadResults)
   const [lastEval,setLastEval]=useState(null)
+  const [slotCorrectState,setSlotCorrectState]=useState({})
 
   const scenarioObj = SCENARIOS.find(s=>s.id===scenario)
 
@@ -101,22 +103,19 @@ export default function App(){
 
   function validate(){
     const slotCorrect = {}; [...left, ...right].forEach(id => { slotCorrect[id] = placement[id] === id })
-    let pairsOK = 0, pairCorrect = {}
+    let pairsOK = 0
     if(CORRECT_MAP){
       Object.entries(CORRECT_MAP).forEach(([phaseId,testId])=>{
-        const ok = !!(slotCorrect[phaseId] && slotCorrect[testId])
-        pairCorrect[phaseId] = ok; if(ok) pairsOK += 1
+        if(slotCorrect[phaseId] && slotCorrect[testId]) pairsOK += 1
       })
     }
-    const slotsOK = Object.values(slotCorrect).filter(Boolean).length
-
-    setScore(pairsOK); setValidated(true); setRunning(false)
+    setScore(pairsOK); setValidated(true); setRunning(false); setSlotCorrectState(slotCorrect)
 
     const result = {
       session: SESSION_ID, team, scenario, elapsed_seconds: seconds,
       pairs_ok: pairsOK, total_pairs: CORRECT_MAP ? Object.keys(CORRECT_MAP).length : 0,
-      slots_ok: slotsOK, total_slots: left.length + right.length,
-      placement, slot_correct: slotCorrect, pair_correct: pairCorrect,
+      slots_ok: Object.values(slotCorrect).filter(Boolean).length, total_slots: left.length + right.length,
+      placement, slot_correct: slotCorrect,
       timestamp: new Date().toISOString(), user_agent: navigator.userAgent
     }
     setLastEval(result)
@@ -128,7 +127,7 @@ export default function App(){
     const data = lastEval || { team, scenario, elapsed_seconds: seconds, score, placement, timestamp: new Date().toISOString(), session: SESSION_ID }
     const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'})
     const url = URL.createObjectURL(blob); const a = document.createElement('a')
-    a.href=url; a.download=`resultado_vmodel_${(data.team||team).replace(/\\s+/g,'_')}.json`; a.click(); URL.revokeObjectURL(url)
+    a.href=url; a.download=`resultado_vmodel_${(data.team||team).replace(/\s+/g,'_')}.json`; a.click(); URL.revokeObjectURL(url)
   }
 
   function unlockTeacher(){
@@ -136,6 +135,7 @@ export default function App(){
     const val = prompt('Ingresa PIN docente'); if(val===TEACHER_PIN) setTeacherUnlocked(true); else alert('PIN incorrecto')
   }
 
+  // Generador de enlaces
   const [mapInput,setMapInput]=useState('{"req-sis":"t-acep","req-sw":"t-sis","dis-arq":"t-int","dis-mod":"t-unit"}')
   const [pinInput,setPinInput]=useState('2468')
   const [sessionInput,setSessionInput]=useState(SESSION_ID)
@@ -152,14 +152,17 @@ export default function App(){
       const stud = `${base}?session=${encodeURIComponent(sessionInput)}&map=${b64}${sinkPart}`
       const teach = `${base}?session=${encodeURIComponent(sessionInput)}&map=${b64}${sinkPart}&pin=${encodeURIComponent(pinInput)}&admin=1`
       setStudentLink(stud); setTeacherLink(teach)
-      if(navigator.clipboard) navigator.clipboard.writeText(stud).catch(()=>{}) // copia link de estudiante
-    }catch(e){ alert('JSON inválido en el mapa. Verifica comillas y llaves.') }
+      if(navigator.clipboard) navigator.clipboard.writeText(stud).catch(()=>{}) // copia link estudiante
+    }catch(e){ alert('JSON inválido en el mapa.') }
   }
   const openStudent = ()=>{ if(studentLink) window.open(studentLink,'_blank') }
   const openTeacher = ()=>{ if(teacherLink) window.open(teacherLink,'_blank') }
 
-  const placedIds = new Set(Object.values(placement).filter(Boolean))
-  const bankCards = cards.filter(c=>!placedIds.has(c.id))
+  // Posiciones de slots para la V (porcentaje vertical)
+  const leftOrder=['req-sis','req-sw','dis-arq','dis-mod','cod']
+  const rightOrder=['t-acep','t-sis','t-int','t-unit']
+  const leftY=[5,30,55,80,95]   // baja
+  const rightY=[95,70,45,20]    // sube
 
   return (
     <div className="container">
@@ -175,79 +178,74 @@ export default function App(){
           <div className="small muted">Tiempo</div><div className="score">{timeFmt(seconds)}</div>
           <div className="row"><button onClick={()=>setRunning(r=>!r)}>{running?'Pausar':'Reanudar'}</button><button onClick={()=>{setSeconds(0); setRunning(true)}}>Reiniciar</button></div>
         </div>
-        <div className="small muted" style={{marginTop:6}}>{SCENARIOS.find(s=>s.id===scenario)?.description}</div>
+        <div className="small muted" style={{marginTop:6}}>{scenarioObj?.description}</div>
       </div>
 
-      <div className="grid grid-3" style={{marginTop:12}}>
-        <div>
-          <div className="small" style={{fontWeight:600, marginBottom:6}}>Desarrollo</div>
-          <div className="grid">
-            {LEFT_PHASES.map(f=>(<Slot key={f.id} id={f.id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated}/>))}
-          </div>
-        </div>
+      {/* Tablero en V */}
+      <div className="panel" style={{marginTop:12}}>
+        <div style={{fontWeight:600, marginBottom:6}}>Tablero en “V”</div>
+        <div className="vboard">
+          {/* Conectores */}
+          <svg width="100%" height="100%" style={{position:'absolute', inset:0, pointerEvents:'none'}}>
+            {rightOrder.map((rid, i)=>{
+              const x1 = '12%'; const x2 = '88%'
+              const y1 = `${leftY[i]}%`; const y2 = `${rightY[i]}%`
+              const ok = validated ? ((slotCorrectState[leftOrder[i]] && slotCorrectState[rightOrder[i]]) ? '#16a34a' : '#ef4444') : '#cbd5e1'
+              return <line key={rid} x1={x1} y1={y1} x2={x2} y2={y2} stroke={ok} strokeWidth={2} strokeDasharray={validated?0:6} />
+            })}
+          </svg>
 
-        <div>
-          <div className="panel">
-            <div className="row" style={{justifyContent:'space-between'}}>
-              <div style={{fontWeight:600}}>Banco de tarjetas</div>
-              <div className="small muted">Arrastra desde aquí</div>
-            </div>
-            <div className="bank" onDrop={onDropBank} onDragOver={e=>e.preventDefault()}>
-              {bankCards.length===0 ? <div className="small muted">No hay tarjetas disponibles.</div> :
-                <div className="row">{bankCards.map(c=>(<AppCard key={c.id} id={c.id} label={c.label}/>))}</div>}
-            </div>
-            <div className="row" style={{marginTop:10}}>
-              <button onClick={()=>resetBoard(false)}>Reiniciar</button>
-              <button onClick={()=>resetBoard(true)}>Mezclar tarjetas</button>
-              <button className="primary" onClick={validate}>Validar</button>
-              <button onClick={exportResults}>Exportar resultado</button>
-              <button onClick={()=>{ if(!parsePinParam()) alert('No hay PIN en la URL (?pin=...)'); else unlockTeacher(); }}>Modo docente (PIN)</button>
-              {teacherUnlocked ? <span className="small">🔓 Docente activo</span> : <span className="small">🔒 Docente bloqueado</span>}
-            </div>
+          {/* Columna izquierda (descendiendo) */}
+          {leftOrder.map((id,idx)=> (\n            <div key={id} className="vleft" style={{top:`${leftY[idx]}%`}}>\n              <div className="vlabel">{idx===0?'Desarrollo':''}</div>\n              <Slot id={id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated} side=\"left\"/>\n            </div>\n          ))}
 
-            {validated && (
-              <div className="panel" style={{marginTop:10}}>
-                {!CORRECT_MAP ? (
-                  <div className="small" style={{color:'#b91c1c'}}>Validación deshabilitada — agrega ?map=... (Base64).</div>
-                ) : (
-                  <div className="small">Parejas correctas: <b>{score}</b> / {Object.keys(CORRECT_MAP).length}</div>
-                )}
-                <div className="small muted">Las celdas correctas se marcan en verde; incorrectas en rojo.</div>
+          {/* Banco al centro */}
+          <div className="vcenter" style={{top:'10%'}}>
+            <div className="panel" style={{padding:12}}>
+              <div className="row" style={{justifyContent:'space-between'}}>
+                <div style={{fontWeight:600}}>Banco de tarjetas</div>
+                <div className="small muted">Arrastra desde aquí</div>
               </div>
-            )}
+              <div className="bank" onDrop={onDropBank} onDragOver={e=>e.preventDefault()}>
+                {cards.filter(c=>!Object.values(placement).includes(c.id)).length===0
+                  ? <div className="small muted">No hay tarjetas disponibles.</div>
+                  : <div className="row">{cards.filter(c=>!Object.values(placement).includes(c.id)).map(c=>(<AppCard key={c.id} id={c.id} label={c.label}/>))}</div>}
+              </div>
+              <div className="row" style={{marginTop:10}}>
+                <button onClick={()=>resetBoard(false)}>Reiniciar</button>
+                <button onClick={()=>resetBoard(true)}>Mezclar</button>
+                <button className="primary" onClick={validate}>Validar</button>
+                <button onClick={exportResults}>Exportar</button>
+                <button onClick={()=>{ if(!parsePinParam()) alert('No hay PIN en la URL (?pin=...)'); else unlockTeacher(); }}>Modo docente (PIN)</button>
+                {teacherUnlocked ? <span className="small">🔓</span> : <span className="small">🔒</span>}
+              </div>
+
+              {validated && (
+                <div className="panel" style={{marginTop:10}}>
+                  {!CORRECT_MAP ? (
+                    <div className="small" style={{color:'#b91c1c'}}>Validación deshabilitada — agrega ?map=... (Base64).</div>
+                  ) : (
+                    <div className="small">Parejas correctas: <b>{score}</b> / {Object.keys(CORRECT_MAP).length}</div>
+                  )}
+                  <div className="small muted">Las celdas correctas se marcan en verde; incorrectas en rojo.</div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="panel" style={{marginTop:8}}>
-            <div style={{fontWeight:600, marginBottom:6}}>Relaciones esperadas</div>
-            {(CORRECT_MAP && teacherUnlocked) ? (
-              <ul className="small">
-                <li>Requerimientos del sistema ↔ Pruebas de aceptación</li>
-                <li>Requisitos de software ↔ Pruebas de sistema</li>
-                <li>Diseño de arquitectura ↔ Pruebas de integración</li>
-                <li>Diseño de módulos ↔ Pruebas unitarias</li>
-              </ul>
-            ) : (
-              <div className="small muted">(Oculto para estudiantes) — Habilitar con ?map=... y PIN docente.</div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <div className="small" style={{fontWeight:600, marginBottom:6}}>Pruebas</div>
-          <div className="grid">
-            {RIGHT_TESTS.map(t=>(<Slot key={t.id} id={t.id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated}/>))}
-          </div>
+          {/* Columna derecha (ascendiendo) */}
+          {rightOrder.map((id,idx)=> (\n            <div key={id} className="vright" style={{top:`${rightY[idx]}%`}}>\n              <div className="vlabel" style={{textAlign:'right'}}>{idx===0?'Pruebas':''}</div>\n              <Slot id={id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated} side=\"right\"/>\n            </div>\n          ))}
         </div>
       </div>
 
+      {/* Generador de enlaces */}
       <div className="panel" style={{marginTop:12}}>
         <div style={{fontWeight:600, marginBottom:6}}>Generador de enlaces (docente)</div>
         <div className="small muted">Crea un <b>link de estudiantes</b> (único para todos) y un <b>link de docente</b> (admin) con PIN. Usa <b>Session ID</b> para agrupar resultados y un <b>Sink</b> opcional para recoger respuestas vía POST.</div>
-        <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8}}>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8}}>
           <div>
             <div className="small muted">Mapa (JSON)</div>
             <textarea value={mapInput} onChange={e=>setMapInput(e.target.value)} style={{width:'100%', height:110, fontFamily:'monospace', fontSize:12, marginTop:6, border:'1px solid var(--border)', borderRadius:12, padding:8}}/>
-            <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8}}>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8}}>
               <div><div className="small muted">Session ID</div><input value={sessionInput} onChange={e=>setSessionInput(e.target.value)}/></div>
               <div><div className="small muted">PIN docente</div><input value={pinInput} onChange={e=>setPinInput(e.target.value)}/></div>
             </div>
@@ -280,11 +278,4 @@ export default function App(){
               <button onClick={()=>{ if(confirm('¿Borrar resultados locales de esta sesión?')){ localStorage.removeItem('vmodel_results_'+SESSION_ID); setResults([]); }}}>Borrar</button>
             </div>
           </div>
-          <div className="small muted" style={{marginTop:6}}>(Para ver contenido, activa <b>Modo docente (PIN)</b> en la vista con &admin=1 y PIN en la URL.)</div>
-        </div>
-      )}
-
-      <div className="footer">© Dinámica educativa — Modelo en V</div>
-    </div>
-  )
-}
+          <div className="small muted" style={{marginTop:6}}>(Para ver contenido, activa <b>Modo docente (PIN)</b> en la vista con &admin=1 y PIN en la URL.)</div>\n        </div>\n      )\n\n      <div className=\"footer\">© Dinámica educativa — Modelo en V</div>\n    </div>\n  )\n}\n
