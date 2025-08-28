@@ -12,7 +12,7 @@ button.primary{background:#0f172a;color:#fff}
 .card{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:8px 10px;display:inline-block;cursor:grab}.card:active{cursor:grabbing}
 .small{font-size:12px}.score{font-weight:700}.footer{font-size:12px;color:var(--muted);text-align:center;padding:24px 0}
 .break-all{word-break:break-all}
-.vboard{position:relative;height:460px;border:1px dashed var(--border);border-radius:16px;background:#fff;overflow:hidden}
+.vboard{position:relative;height:480px;border:1px dashed var(--border);border-radius:16px;background:#fff;overflow:hidden}
 .vleft,.vright,.vcenter{position:absolute;width:28%}
 .vleft{left:2%}.vright{right:2%}.vcenter{left:36%;width:28%}
 .vlabel{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}

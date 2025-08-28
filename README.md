@@ -1,11 +1,10 @@
-# Dinámica interactiva: Modelo en V — v1.6 (V real)
+# Dinámica interactiva: Modelo en V — v1.7
 
-- **Disposición en V real** con conectores SVG (gris; tras validar: verde/rojo por pareja).
-- Validación por `?map=BASE64_JSON` (sin respuestas quemadas) y **PIN docente** `?pin=XXXX`.
-- **Link único de estudiantes** y **link docente** (admin) en ventanas separadas.
-- **Feedback por celda** (verde/rojo), **puntaje por parejas**.
-- **Sesiones** `?session=...` con panel **admin** (`&admin=1`) y export CSV/JSON.
-- **Sink** `&sink=https://...` para recibir resultados por POST.
+- **Requisitos unificados** (sistema + software) en un solo slot.
+- **Columna derecha reordenada**: Aceptación → Sistema → Integración → Unitaria.
+- **Tablero en V real** con conectores (gris antes de validar; verde/rojo tras validar por pareja).
+- **Nada “quemado”**: mapa de parejas por `?map=BASE64_JSON` (por defecto: `{"req":"t-acep","dis-arq":"t-sis","dis-mod":"t-int","cod":"t-unit"}`).
+- Links separados **estudiante** y **docente** (PIN), sesiones y export CSV/JSON, sink opcional.
 
 ## Local
 ```

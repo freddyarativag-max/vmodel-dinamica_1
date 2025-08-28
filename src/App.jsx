@@ -1,19 +1,18 @@
 import React, { useMemo, useState, useEffect } from 'react'
 
-// v1.6 — Disposición real en V con conectores SVG; scoring por parejas; vista admin, sesiones y enlaces alumno/docente.
+// v1.7 — Requisitos unificados, columna derecha reordenada (Acep→Sis→Int→Unit) y tablero en V real con conectores.
 
 const LEFT_PHASES = [
-  { id: 'req-sis', label: 'Requerimientos del sistema' },
-  { id: 'req-sw', label: 'Requisitos de software' },
+  { id: 'req', label: 'Requisitos (sistema + software)' },
   { id: 'dis-arq', label: 'Diseño de arquitectura' },
   { id: 'dis-mod', label: 'Diseño de módulos' },
   { id: 'cod', label: 'Codificación' },
 ]
 const RIGHT_TESTS = [
-  { id: 't-unit', label: 'Pruebas unitarias' },
-  { id: 't-int', label: 'Pruebas de integración' },
-  { id: 't-sis', label: 'Pruebas de sistema' },
   { id: 't-acep', label: 'Pruebas de aceptación' },
+  { id: 't-sis', label: 'Pruebas de sistema' },
+  { id: 't-int', label: 'Pruebas de integración' },
+  { id: 't-unit', label: 'Pruebas unitarias' },
 ]
 
 const SCENARIOS = [
@@ -33,7 +32,7 @@ function timeFmt(s){ const m=Math.floor(s/60); const r=s%60; return `${m}:${Stri
 
 function AppCard({id,label}){ return <div className="card" draggable onDragStart={e=>e.dataTransfer.setData('text/plain', id)}>{label}</div> }
 
-function Slot({id, cards, placement, setPlacement, validated, side}){
+function Slot({id, cards, placement, setPlacement, validated}){
   const cardId = placement[id]
   const card = cards.find(c=>c.id===cardId)
   const isCorrect = validated && placement[id] === id
@@ -69,6 +68,7 @@ export default function App(){
   const [seconds,setSeconds]=useTimer(running)
   const [validated,setValidated]=useState(false)
   const [score,setScore]=useState(0)
+  const [slotCorrectState,setSlotCorrectState]=useState({})
 
   const CORRECT_MAP = useMemo(()=>parseMapParam(),[])
   const TEACHER_PIN = useMemo(()=>parsePinParam(),[])
@@ -82,7 +82,6 @@ export default function App(){
   const loadResults = ()=>{ try{ return JSON.parse(localStorage.getItem('vmodel_results_'+SESSION_ID)) || [] }catch{ return [] } }
   const [results,setResults]=useState(loadResults)
   const [lastEval,setLastEval]=useState(null)
-  const [slotCorrectState,setSlotCorrectState]=useState({})
 
   const scenarioObj = SCENARIOS.find(s=>s.id===scenario)
 
@@ -127,7 +126,7 @@ export default function App(){
     const data = lastEval || { team, scenario, elapsed_seconds: seconds, score, placement, timestamp: new Date().toISOString(), session: SESSION_ID }
     const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'})
     const url = URL.createObjectURL(blob); const a = document.createElement('a')
-    a.href=url; a.download=`resultado_vmodel_${(data.team||team).replace(/\s+/g,'_')}.json`; a.click(); URL.revokeObjectURL(url)
+    a.href=url; a.download=`resultado_vmodel_${(data.team||team).replace(/\\s+/g,'_')}.json`; a.click(); URL.revokeObjectURL(url)
   }
 
   function unlockTeacher(){
@@ -136,7 +135,7 @@ export default function App(){
   }
 
   // Generador de enlaces
-  const [mapInput,setMapInput]=useState('{"req-sis":"t-acep","req-sw":"t-sis","dis-arq":"t-int","dis-mod":"t-unit"}')
+  const [mapInput,setMapInput]=useState('{\"req\":\"t-acep\",\"dis-arq\":\"t-sis\",\"dis-mod\":\"t-int\",\"cod\":\"t-unit\"}')
   const [pinInput,setPinInput]=useState('2468')
   const [sessionInput,setSessionInput]=useState(SESSION_ID)
   const [sinkInput,setSinkInput]=useState(SINK_URL)
@@ -153,16 +152,16 @@ export default function App(){
       const teach = `${base}?session=${encodeURIComponent(sessionInput)}&map=${b64}${sinkPart}&pin=${encodeURIComponent(pinInput)}&admin=1`
       setStudentLink(stud); setTeacherLink(teach)
       if(navigator.clipboard) navigator.clipboard.writeText(stud).catch(()=>{}) // copia link estudiante
-    }catch(e){ alert('JSON inválido en el mapa.') }
+    }catch(e){ alert('JSON inválido en el mapa. Verifica comillas y llaves.') }
   }
   const openStudent = ()=>{ if(studentLink) window.open(studentLink,'_blank') }
   const openTeacher = ()=>{ if(teacherLink) window.open(teacherLink,'_blank') }
 
-  // Posiciones de slots para la V (porcentaje vertical)
-  const leftOrder=['req-sis','req-sw','dis-arq','dis-mod','cod']
+  // Posiciones de la V
+  const leftOrder=['req','dis-arq','dis-mod','cod']
   const rightOrder=['t-acep','t-sis','t-int','t-unit']
-  const leftY=[5,30,55,80,95]   // baja
-  const rightY=[95,70,45,20]    // sube
+  const leftY=[5,30,55,85]
+  const rightY=[15,40,65,90]
 
   return (
     <div className="container">
@@ -195,8 +194,8 @@ export default function App(){
             })}
           </svg>
 
-          {/* Columna izquierda (descendiendo) */}
-          {leftOrder.map((id,idx)=> (\n            <div key={id} className="vleft" style={{top:`${leftY[idx]}%`}}>\n              <div className="vlabel">{idx===0?'Desarrollo':''}</div>\n              <Slot id={id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated} side=\"left\"/>\n            </div>\n          ))}
+          {/* Columna izquierda */}
+          {leftOrder.map((id,idx)=> (\n            <div key={id} className="vleft" style={{top:`${leftY[idx]}%`}}>\n              <div className="vlabel">{idx===0?'Desarrollo':''}</div>\n              <Slot id={id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated}/>\n            </div>\n          ))}
 
           {/* Banco al centro */}
           <div className="vcenter" style={{top:'10%'}}>
@@ -217,65 +216,4 @@ export default function App(){
                 <button onClick={exportResults}>Exportar</button>
                 <button onClick={()=>{ if(!parsePinParam()) alert('No hay PIN en la URL (?pin=...)'); else unlockTeacher(); }}>Modo docente (PIN)</button>
                 {teacherUnlocked ? <span className="small">🔓</span> : <span className="small">🔒</span>}
-              </div>
-
-              {validated && (
-                <div className="panel" style={{marginTop:10}}>
-                  {!CORRECT_MAP ? (
-                    <div className="small" style={{color:'#b91c1c'}}>Validación deshabilitada — agrega ?map=... (Base64).</div>
-                  ) : (
-                    <div className="small">Parejas correctas: <b>{score}</b> / {Object.keys(CORRECT_MAP).length}</div>
-                  )}
-                  <div className="small muted">Las celdas correctas se marcan en verde; incorrectas en rojo.</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Columna derecha (ascendiendo) */}
-          {rightOrder.map((id,idx)=> (\n            <div key={id} className="vright" style={{top:`${rightY[idx]}%`}}>\n              <div className="vlabel" style={{textAlign:'right'}}>{idx===0?'Pruebas':''}</div>\n              <Slot id={id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated} side=\"right\"/>\n            </div>\n          ))}
-        </div>
-      </div>
-
-      {/* Generador de enlaces */}
-      <div className="panel" style={{marginTop:12}}>
-        <div style={{fontWeight:600, marginBottom:6}}>Generador de enlaces (docente)</div>
-        <div className="small muted">Crea un <b>link de estudiantes</b> (único para todos) y un <b>link de docente</b> (admin) con PIN. Usa <b>Session ID</b> para agrupar resultados y un <b>Sink</b> opcional para recoger respuestas vía POST.</div>
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8}}>
-          <div>
-            <div className="small muted">Mapa (JSON)</div>
-            <textarea value={mapInput} onChange={e=>setMapInput(e.target.value)} style={{width:'100%', height:110, fontFamily:'monospace', fontSize:12, marginTop:6, border:'1px solid var(--border)', borderRadius:12, padding:8}}/>
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8}}>
-              <div><div className="small muted">Session ID</div><input value={sessionInput} onChange={e=>setSessionInput(e.target.value)}/></div>
-              <div><div className="small muted">PIN docente</div><input value={pinInput} onChange={e=>setPinInput(e.target.value)}/></div>
-            </div>
-            <div style={{marginTop:8}}><div className="small muted">Sink (opcional, recibe POST)</div><input value={sinkInput} onChange={e=>setSinkInput(e.target.value)} placeholder="https://..."/></div>
-          </div>
-          <div>
-            <button onClick={generateLinks}>Generar enlaces</button>
-            {studentLink && (
-              <div className="small" style={{marginTop:8}}>
-                <div className="score">Estudiante:</div><div className="break-all">{studentLink}</div>
-                <div className="score" style={{marginTop:6}}>Docente (admin):</div><div className="break-all">{teacherLink}</div>
-                <div className="row" style={{marginTop:6}}>
-                  <button onClick={openStudent}>Abrir Estudiante</button>
-                  <button onClick={openTeacher}>Abrir Docente</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {ADMIN_VIEW && (
-        <div className="panel" style={{marginTop:12}}>
-          <div className="row" style={{justifyContent:'space-between'}}>
-            <div style={{fontWeight:600}}>Resultados de la sesión: {SESSION_ID}</div>
-            <div className="row">
-              <button onClick={()=>setResults(loadResults())}>Actualizar</button>
-              <button onClick={()=>{const data=JSON.stringify(results,null,2); const b=new Blob([data],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`resultados_${SESSION_ID}.json`; a.click(); URL.revokeObjectURL(u);}}>Exportar JSON</button>
-              <button onClick={()=>{const header=['team','scenario','pairs_ok','total_pairs','slots_ok','total_slots','elapsed_seconds','timestamp']; const rows=results.map(r=>[r.team,r.scenario,r.pairs_ok,r.total_pairs,r.slots_ok,r.total_slots,r.elapsed_seconds,r.timestamp].map(x=>`"${(x??'').toString().replace(/"/g,'""')}"`).join(',')); const csv=[header.join(','),...rows].join('\\n'); const b=new Blob([csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`resultados_${SESSION_ID}.csv`; a.click(); URL.revokeObjectURL(u);}}>Exportar CSV</button>
-              <button onClick={()=>{ if(confirm('¿Borrar resultados locales de esta sesión?')){ localStorage.removeItem('vmodel_results_'+SESSION_ID); setResults([]); }}}>Borrar</button>
-            </div>
-          </div>
-          <div className="small muted" style={{marginTop:6}}>(Para ver contenido, activa <b>Modo docente (PIN)</b> en la vista con &admin=1 y PIN en la URL.)</div>\n        </div>\n      )\n\n      <div className=\"footer\">© Dinámica educativa — Modelo en V</div>\n    </div>\n  )\n}\n
+              </div>\n              {validated && (\n                <div className="panel" style={{marginTop:10}}>\n                  {!CORRECT_MAP ? (\n                    <div className="small" style={{color:'#b91c1c'}}>Validación deshabilitada — agrega ?map=... (Base64).</div>\n                  ) : (\n                    <div className="small">Parejas correctas: <b>{score}</b> / {Object.keys(CORRECT_MAP).length}</div>\n                  )}\n                  <div className="small muted">Las celdas correctas se marcan en verde; incorrectas en rojo.</div>\n                </div>\n              )}\n            </div>\n          </div>\n\n          {/* Columna derecha */}\n          {rightOrder.map((id,idx)=> (\n            <div key={id} className="vright" style={{top:`${rightY[idx]}%`}}>\n              <div className="vlabel" style={{textAlign:'right'}}>{idx===0?'Pruebas':''}</div>\n              <Slot id={id} cards={cards} placement={placement} setPlacement={setPlacement} validated={validated}/>\n            </div>\n          ))}\n        </div>\n      </div>\n\n      {/* Generador de enlaces */}\n      <div className="panel" style={{marginTop:12}}>\n        <div style={{fontWeight:600, marginBottom:6}}>Generador de enlaces (docente)</div>\n        <div className="small muted">Crea un <b>link de estudiantes</b> (único para todos) y un <b>link de docente</b> (admin) con PIN. Usa <b>Session ID</b> para agrupar resultados y un <b>Sink</b> opcional para recoger respuestas vía POST.</div>\n        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8}}>\n          <div>\n            <div className="small muted">Mapa (JSON)</div>\n            <textarea value={mapInput} onChange={e=>setMapInput(e.target.value)} style={{width:'100%', height:110, fontFamily:'monospace', fontSize:12, marginTop:6, border:'1px solid var(--border)', borderRadius:12, padding:8}}/>\n            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8}}>\n              <div><div className="small muted">Session ID</div><input value={sessionInput} onChange={e=>setSessionInput(e.target.value)}/></div>\n              <div><div className="small muted">PIN docente</div><input value={pinInput} onChange={e=>setPinInput(e.target.value)}/></div>\n            </div>\n            <div style={{marginTop:8}}><div className="small muted">Sink (opcional, recibe POST)</div><input value={sinkInput} onChange={e=>setSinkInput(e.target.value)} placeholder="https://..."/></div>\n          </div>\n          <div>\n            <button onClick={generateLinks}>Generar enlaces</button>\n            {studentLink && (\n              <div className="small" style={{marginTop:8}}>\n                <div className="score">Estudiante:</div><div className="break-all">{studentLink}</div>\n                <div className="score" style={{marginTop:6}}>Docente (admin):</div><div className="break-all">{teacherLink}</div>\n                <div className="row" style={{marginTop:6}}>\n                  <button onClick={openStudent}>Abrir Estudiante</button>\n                  <button onClick={openTeacher}>Abrir Docente</button>\n                </div>\n              </div>\n            )}\n          </div>\n        </div>\n      </div>\n\n      {ADMIN_VIEW && (\n        <div className="panel" style={{marginTop:12}}>\n          <div className="row" style={{justifyContent:'space-between'}}>\n            <div style={{fontWeight:600}}>Resultados de la sesión: {SESSION_ID}</div>\n            <div className="row">\n              <button onClick={()=>setResults(loadResults())}>Actualizar</button>\n              <button onClick={()=>{const data=JSON.stringify(results,null,2); const b=new Blob([data],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`resultados_${SESSION_ID}.json`; a.click(); URL.revokeObjectURL(u);}}>Exportar JSON</button>\n              <button onClick={()=>{const header=['team','scenario','pairs_ok','total_pairs','slots_ok','total_slots','elapsed_seconds','timestamp']; const rows=results.map(r=>[r.team,r.scenario,r.pairs_ok,r.total_pairs,r.slots_ok,r.total_slots,r.elapsed_seconds,r.timestamp].map(x=>`\"${(x??'').toString().replace(/\\\"/g,'\\\"\\\"')}\"`).join(',')); const csv=[header.join(','),...rows].join('\\n'); const b=new Blob([csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`resultados_${SESSION_ID}.csv`; a.click(); URL.revokeObjectURL(u);}}>Exportar CSV</button>\n              <button onClick={()=>{ if(confirm('¿Borrar resultados locales de esta sesión?')){ localStorage.removeItem('vmodel_results_'+SESSION_ID); setResults([]); }}}>Borrar</button>\n            </div>\n          </div>\n          <div className="small muted" style={{marginTop:6}}>(Para ver contenido, activa <b>Modo docente (PIN)</b> en la vista con &admin=1 y PIN en la URL.)</div>\n        </div>\n      )}\n\n      <div className=\"footer\">© Dinámica educativa — Modelo en V</div>\n    </div>\n  )\n}\n
